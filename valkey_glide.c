@@ -13,6 +13,7 @@
 #include "valkey_glide_arginfo.h"          // Include generated arginfo header
 #include "valkey_glide_cluster_arginfo.h"  // Include generated arginfo header
 #include "valkey_glide_commands_common.h"
+#include "valkey_glide_core_common.h"
 #include "valkey_glide_hash_common.h"
 
 /* Enum support includes - must be BEFORE arginfo includes */
@@ -614,6 +615,17 @@ PHP_METHOD(ValkeyGlide, close) {
     /* TODO: Implement ValkeyGlide close */
     RETURN_TRUE;
 }
+/* }}} */
+
+/* {{{ proto string ValkeyGlide::updateConnectionPassword(string $password, bool $immediateAuth =
+ * false)
+ */
+UPDATE_CONNECTION_PASSWORD_METHOD_IMPL(ValkeyGlide)
+/* }}} */
+
+/* {{{ proto string ValkeyGlide::clearConnectionPassword(bool $immediateAuth = false)
+ */
+CLEAR_CONNECTION_PASSWORD_METHOD_IMPL(ValkeyGlide)
 /* }}} */
 
 /* Basic method stubs - these need to be implemented with ValkeyGlide */
