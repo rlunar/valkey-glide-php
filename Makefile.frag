@@ -89,8 +89,8 @@ ensure-submodules:
 				echo "ERROR: Git is required to build this extension"; \
 				exit 1; \
 			fi; \
-			grep -E "^\s*path\s*=" .gitmodules | sed 's/.*=\s*//' | while read path; do \
-				url=$$(grep -A1 "path = $$path" .gitmodules | grep url | sed 's/.*=\s*//'); \
+			grep -E "^\s*path\s*=" .gitmodules | sed 's/.*=[ \t]*//' | while read path; do \
+				url=$$(grep -A1 "path = $$path" .gitmodules | grep url | sed 's/^[^=]*=[ \t]*//'); \
 				if [ ! -d "$$path/.git" ]; then \
 					echo "Cloning $$url into $$path"; \
 					rm -rf "$$path"; \
@@ -123,7 +123,13 @@ include/glide_bindings.h: valkey-glide/ffi/target/release/libglide_ffi.a ensure-
 	if [ -f "$$HOME/.cargo/env" ]; then \
 		. "$$HOME/.cargo/env"; \
 	fi && \
-	if [ -d valkey-glide/ffi ] && command -v cbindgen >/dev/null 2>&1; then \
+	if ! command -v cbindgen >/dev/null 2>&1; then \
+		echo "ERROR: cbindgen not found in PATH"; \
+		echo "Please install cbindgen with: cargo install cbindgen"; \
+		echo "Or ensure $$HOME/.cargo/bin is in your PATH"; \
+		exit 1; \
+	fi && \
+	if [ -d valkey-glide/ffi ]; then \
 		cd valkey-glide/ffi && cbindgen --output ../../include/glide_bindings.h && cd ../..; \
 		echo '#ifndef GLIDE_BINDINGS_H' > include/glide_bindings_tmp.h; \
 		echo '#define GLIDE_BINDINGS_H' >> include/glide_bindings_tmp.h; \
