@@ -15,7 +15,6 @@ on:
       - .github/workflows/install-shared-dependencies/action.yml
       - .github/workflows/build-php-wrapper/action.yml
       - .github/workflows/test-benchmark/action.yml
-      - .github/workflows/lint-rust/action.yml
       - .github/workflows/install-engine/action.yml
       - .github/workflows/create-test-matrices/action.yml
       - .github/json_matrices/**
@@ -29,7 +28,6 @@ on:
       - .github/workflows/install-shared-dependencies/action.yml
       - .github/workflows/build-php-wrapper/action.yml
       - .github/workflows/test-benchmark/action.yml
-      - .github/workflows/lint-rust/action.yml
       - .github/workflows/install-engine/action.yml
       - .github/workflows/create-test-matrices/action.yml
       - .github/json_matrices/**
@@ -842,13 +840,13 @@ jobs:
               libtool \
               pkg-config \
               libssl-dev \
-              clang-format \
               protobuf-c-compiler \
               libprotobuf-c-dev \
               libprotobuf-c1
 
-      - name: Check clang-format version
-        run: clang-format --version
+          # Install clang-format-18 and set it as default.
+          sudo apt-get install -y clang-format-18
+          sudo update-alternatives --install /usr/bin/clang-format clang-format /usr/bin/clang-format-18 100
 
       - name: Install protoc
         uses: ./.github/workflows/install-rust-and-protoc
@@ -890,15 +888,9 @@ jobs:
         run: |
           ./configure --enable-valkey-glide --disable-header-generation
 
-      - name: Lint C code formatting
+      - name: Run linters
         run: |
-          find . -name "*.c" -o -name "*.h" | grep -v "\.pb-c\." | xargs clang-format --dry-run --Werror
-
-      - name: Lint PHP code (if PHP files exist)
-        run: |
-          if find tests/ -name "*.php" | head -1 | grep -q .; then
-              phpcs . || true
-          fi
+          ./lint.sh
 
   get-containers:
     runs-on: ubuntu-latest
