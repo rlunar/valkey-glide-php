@@ -7,9 +7,11 @@
  * including simple cache, cache-aside, write-through, and cache invalidation.
  */
 
+declare(strict_types=1);
+
 // Enable error reporting for debugging
 error_reporting(E_ALL);
-ini_set('display_errors', 1);
+ini_set('display_errors', '1');
 
 // Check if extension is loaded
 if (!extension_loaded('valkey_glide')) {

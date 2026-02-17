@@ -4,6 +4,8 @@
  * Copyright Valkey GLIDE Project Contributors - SPDX Identifier: Apache-2.0
  */
 
+declare(strict_types=1);
+
 /**
  * Endurance/Soak Test for ValkeyGlide PHP Client
  *
@@ -401,7 +403,9 @@ class SoakTest
     }
 }
 
-// Parse command-line arguments
+/**
+ * Parse command-line arguments
+ */
 function parseArguments(): array
 {
     $options = getopt('', [
@@ -419,15 +423,25 @@ function parseArguments(): array
     ];
 }
 
-// Main execution
-$args = parseArguments();
+/**
+ * Main execution
+ */
+function main(): void
+{
+    $args = parseArguments();
 
-echo "Valkey GLIDE PHP Soak Test\n";
-echo "===========================\n";
-echo "Duration: " . number_format($args['duration'], 2) . " hours\n";
-echo "Mode: " . ($args['cluster'] ? 'Cluster' : 'Standalone') . "\n";
-echo "Server: {$args['host']}:{$args['port']}\n";
-echo "===========================\n\n";
+    echo "Valkey GLIDE PHP Soak Test\n";
+    echo "===========================\n";
+    echo "Duration: " . number_format($args['duration'], 2) . " hours\n";
+    echo "Mode: " . ($args['cluster'] ? 'Cluster' : 'Standalone') . "\n";
+    echo "Server: {$args['host']}:{$args['port']}\n";
+    echo "===========================\n\n";
 
-$test = new SoakTest($args['cluster'], $args['host'], $args['port']);
-$test->run($args['duration']);
+    $test = new SoakTest($args['cluster'], $args['host'], $args['port']);
+    $test->run($args['duration']);
+}
+
+// Execute only if run directly
+if (__FILE__ === (get_included_files()[0] ?? '')) {
+    main();
+}
