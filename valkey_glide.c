@@ -176,11 +176,12 @@ void valkey_glide_init_common_constructor_params(
     params->database_id             = 0;
     params->database_id_is_null     = 1;
     params->context                 = NULL;
+    params->compression             = NULL;
 }
 
-void valkey_glide_build_client_config_base(valkey_glide_php_common_constructor_params_t* params,
-                                           valkey_glide_base_client_configuration_t*     config,
-                                           bool is_cluster) {
+int valkey_glide_build_client_config_base(valkey_glide_php_common_constructor_params_t* params,
+                                          valkey_glide_base_client_configuration_t*     config,
+                                          bool is_cluster) {
     /* Basic configuration */
     config->request_timeout =
         params->request_timeout_is_null ? -1 : params->request_timeout; /* -1 means not set */
@@ -268,7 +269,7 @@ void valkey_glide_build_client_config_base(valkey_glide_php_common_constructor_p
             VALKEY_LOG_ERROR("php_construct", error_message);
             zend_throw_exception(get_valkey_glide_exception_ce(), error_message, 0);
             valkey_glide_cleanup_client_config(config);
-            return;
+            return FAILURE;
         }
     }
     ZEND_HASH_FOREACH_END();
@@ -283,7 +284,7 @@ void valkey_glide_build_client_config_base(valkey_glide_php_common_constructor_p
 
         /* Check for username */
         zval* username_val = zend_hash_str_find(
-            cred_ht, VALKEY_GLIDE_AUTH_USERNAME, strlen(VALKEY_GLIDE_AUTH_USERNAME));
+            cred_ht, VALKEY_GLIDE_AUTH_USERNAME, sizeof(VALKEY_GLIDE_AUTH_USERNAME) - 1);
         if (username_val && Z_TYPE_P(username_val) == IS_STRING) {
             config->credentials->username = Z_STRVAL_P(username_val);
         } else {
@@ -292,7 +293,7 @@ void valkey_glide_build_client_config_base(valkey_glide_php_common_constructor_p
 
         /* Check for password */
         zval* password_val = zend_hash_str_find(
-            cred_ht, VALKEY_GLIDE_AUTH_PASSWORD, strlen(VALKEY_GLIDE_AUTH_PASSWORD));
+            cred_ht, VALKEY_GLIDE_AUTH_PASSWORD, sizeof(VALKEY_GLIDE_AUTH_PASSWORD) - 1);
         if (password_val && Z_TYPE_P(password_val) == IS_STRING) {
             config->credentials->password = Z_STRVAL_P(password_val);
         } else {
@@ -301,7 +302,7 @@ void valkey_glide_build_client_config_base(valkey_glide_php_common_constructor_p
 
         /* Check for IAM config (mutually exclusive with password) */
         zval* iam_config_val = zend_hash_str_find(
-            cred_ht, VALKEY_GLIDE_AUTH_IAM_CONFIG, strlen(VALKEY_GLIDE_AUTH_IAM_CONFIG));
+            cred_ht, VALKEY_GLIDE_AUTH_IAM_CONFIG, sizeof(VALKEY_GLIDE_AUTH_IAM_CONFIG) - 1);
         if (iam_config_val && Z_TYPE_P(iam_config_val) == IS_ARRAY) {
             HashTable* iam_ht = Z_ARRVAL_P(iam_config_val);
 
@@ -312,7 +313,7 @@ void valkey_glide_build_client_config_base(valkey_glide_php_common_constructor_p
             zval* cluster_name_val =
                 zend_hash_str_find(iam_ht,
                                    VALKEY_GLIDE_IAM_CONFIG_CLUSTER_NAME,
-                                   strlen(VALKEY_GLIDE_IAM_CONFIG_CLUSTER_NAME));
+                                   sizeof(VALKEY_GLIDE_IAM_CONFIG_CLUSTER_NAME) - 1);
             if (cluster_name_val && Z_TYPE_P(cluster_name_val) == IS_STRING) {
                 config->credentials->iam_config->cluster_name = Z_STRVAL_P(cluster_name_val);
             } else {
@@ -321,7 +322,7 @@ void valkey_glide_build_client_config_base(valkey_glide_php_common_constructor_p
 
             /* Parse region (required) */
             zval* region_val = zend_hash_str_find(
-                iam_ht, VALKEY_GLIDE_IAM_CONFIG_REGION, strlen(VALKEY_GLIDE_IAM_CONFIG_REGION));
+                iam_ht, VALKEY_GLIDE_IAM_CONFIG_REGION, sizeof(VALKEY_GLIDE_IAM_CONFIG_REGION) - 1);
             if (region_val && Z_TYPE_P(region_val) == IS_STRING) {
                 config->credentials->iam_config->region = Z_STRVAL_P(region_val);
             } else {
@@ -329,8 +330,9 @@ void valkey_glide_build_client_config_base(valkey_glide_php_common_constructor_p
             }
 
             /* Parse service type (required) */
-            zval* service_val = zend_hash_str_find(
-                iam_ht, VALKEY_GLIDE_IAM_CONFIG_SERVICE, strlen(VALKEY_GLIDE_IAM_CONFIG_SERVICE));
+            zval* service_val = zend_hash_str_find(iam_ht,
+                                                   VALKEY_GLIDE_IAM_CONFIG_SERVICE,
+                                                   sizeof(VALKEY_GLIDE_IAM_CONFIG_SERVICE) - 1);
             if (service_val && Z_TYPE_P(service_val) == IS_STRING) {
                 const char* service_str = Z_STRVAL_P(service_val);
                 if (strcasecmp(service_str, VALKEY_GLIDE_IAM_SERVICE_MEMORYDB) == 0) {
@@ -349,7 +351,7 @@ void valkey_glide_build_client_config_base(valkey_glide_php_common_constructor_p
             zval* refresh_val =
                 zend_hash_str_find(iam_ht,
                                    VALKEY_GLIDE_IAM_CONFIG_REFRESH_INTERVAL,
-                                   strlen(VALKEY_GLIDE_IAM_CONFIG_REFRESH_INTERVAL));
+                                   sizeof(VALKEY_GLIDE_IAM_CONFIG_REFRESH_INTERVAL) - 1);
             if (refresh_val && Z_TYPE_P(refresh_val) == IS_LONG) {
                 config->credentials->iam_config->refresh_interval_seconds = Z_LVAL_P(refresh_val);
             } else {
@@ -362,8 +364,10 @@ void valkey_glide_build_client_config_base(valkey_glide_php_common_constructor_p
 
             /* Validate that username is provided for IAM */
             if (!config->credentials->username) {
+                valkey_glide_cleanup_client_config(config);
                 zend_throw_exception(
                     get_valkey_glide_exception_ce(), "IAM authentication requires a username", 0);
+                return FAILURE;
             }
         }
     } else {
@@ -419,17 +423,75 @@ void valkey_glide_build_client_config_base(valkey_glide_php_common_constructor_p
     config->use_tls         = _determine_use_tls(params);
     config->advanced_config = _build_advanced_config(params, is_cluster);
 
+    /* If advanced config build failed (exception thrown), clean up and return */
+    if (config->advanced_config == NULL && EG(exception)) {
+        valkey_glide_cleanup_client_config(config);
+        return FAILURE;
+    }
+
     // Raise an exception if insecure TLS is requested but TLS is not enabled
     if (!config->use_tls && config->advanced_config && config->advanced_config->tls_config &&
         config->advanced_config->tls_config->use_insecure_tls) {
         VALKEY_LOG_ERROR("insecure_tls_with_tls_disabled",
                          "Cannot configure insecure TLS when TLS is disabled.");
+        valkey_glide_cleanup_client_config(config);
         zend_throw_exception(get_valkey_glide_exception_ce(),
                              "Cannot configure insecure TLS when TLS is disabled.",
                              0);
+        return FAILURE;
+    }
+
+    /* Process compression configuration if provided */
+    if (params->compression && Z_TYPE_P(params->compression) == IS_ARRAY) {
+        HashTable* compression_ht = Z_ARRVAL_P(params->compression);
+
+        config->compression_config = ecalloc(1, sizeof(valkey_glide_compression_config_t));
+
+        /* Parse enabled (default: false) */
+        zval* enabled_zv                    = zend_hash_str_find(compression_ht,
+                                              VALKEY_GLIDE_COMPRESSION_ENABLED,
+                                              sizeof(VALKEY_GLIDE_COMPRESSION_ENABLED) - 1);
+        config->compression_config->enabled = enabled_zv ? zval_is_true(enabled_zv) : false;
+
+        /* Parse backend (default: ZSTD) */
+        zval* backend_zv = zend_hash_str_find(compression_ht,
+                                              VALKEY_GLIDE_COMPRESSION_BACKEND,
+                                              sizeof(VALKEY_GLIDE_COMPRESSION_BACKEND) - 1);
+        config->compression_config->backend =
+            backend_zv ? (valkey_glide_compression_backend_t) zval_get_long(backend_zv)
+                       : VALKEY_GLIDE_COMPRESSION_BACKEND_ZSTD;
+
+        /* Parse compression_level (optional, -1 = not set) */
+        zval* level_zv                                = zend_hash_str_find(compression_ht,
+                                            VALKEY_GLIDE_COMPRESSION_LEVEL,
+                                            sizeof(VALKEY_GLIDE_COMPRESSION_LEVEL) - 1);
+        config->compression_config->compression_level = level_zv ? zval_get_long(level_zv) : -1;
+
+        /* Parse min_compression_size (default: 64) */
+        zval* min_size_zv = zend_hash_str_find(compression_ht,
+                                               VALKEY_GLIDE_COMPRESSION_MIN_SIZE,
+                                               sizeof(VALKEY_GLIDE_COMPRESSION_MIN_SIZE) - 1);
+        config->compression_config->min_compression_size =
+            min_size_zv ? (uint32_t) zval_get_long(min_size_zv) : 64;
+
+        /* Validate min_compression_size */
+        uint32_t min_allowed = get_min_compressed_size();
+        if (config->compression_config->min_compression_size < min_allowed) {
+            char error_msg[256];
+            snprintf(error_msg,
+                     sizeof(error_msg),
+                     "min_compression_size must be at least %u bytes",
+                     min_allowed);
+            valkey_glide_cleanup_client_config(config);
+            zend_throw_exception(get_valkey_glide_exception_ce(), error_msg, 0);
+            return FAILURE;
+        }
+    } else {
+        config->compression_config = NULL;
     }
 
     _initialize_open_telemetry(params, is_cluster);
+    return SUCCESS;
 }
 
 const zend_function_entry valkey_glide_cluster_methods[] = {
@@ -551,6 +613,11 @@ void valkey_glide_cleanup_client_config(valkey_glide_base_client_configuration_t
         efree(config->advanced_config);
         config->advanced_config = NULL;
     }
+
+    if (config->compression_config) {
+        efree(config->compression_config);
+        config->compression_config = NULL;
+    }
 }
 
 /**
@@ -656,7 +723,8 @@ static int valkey_glide_create_connection(valkey_glide_object* valkey_glide,
                                           size_t               client_az_len,
                                           zval*                advanced_config,
                                           zval*                lazy_connect_zval,
-                                          zval*                context) {
+                                          zval*                context,
+                                          zval*                compression) {
     valkey_glide_php_common_constructor_params_t common_params;
     valkey_glide_init_common_constructor_params(&common_params);
 
@@ -699,7 +767,8 @@ static int valkey_glide_create_connection(valkey_glide_object* valkey_glide,
         common_params.lazy_connect_is_null = false;
     }
 
-    common_params.context = context;
+    common_params.context     = context;
+    common_params.compression = compression;
 
     /* Default to localhost:6379 if no addresses provided */
     zval      addresses_array;
@@ -745,7 +814,12 @@ static int valkey_glide_create_connection(valkey_glide_object* valkey_glide,
     memset(&client_config, 0, sizeof(client_config));
 
     /* Populate configuration parameters shared between client and cluster connections. */
-    valkey_glide_build_client_config_base(&common_params, &client_config, false);
+    if (valkey_glide_build_client_config_base(&common_params, &client_config, false) == FAILURE) {
+        if (created_addresses) {
+            zval_ptr_dtor(&addresses_array);
+        }
+        return FAILURE;
+    }
 
     /* Issue the connection request. */
     const ConnectionResponse* conn_resp = create_glide_client(&client_config);
@@ -808,8 +882,9 @@ PHP_METHOD(ValkeyGlide, connect) {
     zval*  advanced_config      = NULL;
     zval*  lazy_connect_zval    = NULL;
     zval*  context              = NULL;
+    zval*  compression          = NULL;
 
-    ZEND_PARSE_PARAMETERS_START(0, 18)
+    ZEND_PARSE_PARAMETERS_START(0, 19)
     Z_PARAM_OPTIONAL
     Z_PARAM_STRING_OR_NULL(host, host_len)
     Z_PARAM_ZVAL_OR_NULL(port_zval)
@@ -829,6 +904,7 @@ PHP_METHOD(ValkeyGlide, connect) {
     Z_PARAM_ARRAY_OR_NULL(advanced_config)
     Z_PARAM_ZVAL_OR_NULL(lazy_connect_zval)
     Z_PARAM_ZVAL_OR_NULL(context)
+    Z_PARAM_ARRAY_OR_NULL(compression)
     ZEND_PARSE_PARAMETERS_END_EX(RETURN_THROWS());
 
     /* Apply defaults for nullable parameters */
@@ -899,7 +975,8 @@ PHP_METHOD(ValkeyGlide, connect) {
                                                 client_az_len,
                                                 advanced_config,
                                                 lazy_connect_zval,
-                                                context);
+                                                context,
+                                                compression);
 
     /* Clean up temporary addresses array if we created it */
     if (host != NULL) {
@@ -930,6 +1007,10 @@ PHP_METHOD(ValkeyGlide, close) {
     /* TODO: Implement ValkeyGlide close */
     RETURN_TRUE;
 }
+
+/* {{{ proto array ValkeyGlide::getStatistics() */
+GET_STATISTICS_METHOD_IMPL(ValkeyGlide)
+/* }}} */
 
 PHP_METHOD(ValkeyGlide, setOtelSamplePercentage) {
     zend_long percentage;
@@ -1445,7 +1526,9 @@ static valkey_glide_tls_advanced_configuration_t* _build_advanced_tls_config(
         const char* error_msg =
             "At most one of stream context or advanced TLS config can be specified.";
         VALKEY_LOG_ERROR("tls_config_conflict", error_msg);
+        efree(tls_advanced_config);
         zend_throw_exception(get_valkey_glide_exception_ce(), error_msg, 0);
+        return NULL;
     }
 
     // Set TLS configuration from stream context.
@@ -1472,7 +1555,9 @@ static valkey_glide_tls_advanced_configuration_t* _build_advanced_tls_config(
             } else {
                 const char* error_message = "Failed to load root certificate from file";
                 VALKEY_LOG_ERROR("tls_config_cafile", error_message);
+                efree(tls_advanced_config);
                 zend_throw_exception(get_valkey_glide_exception_ce(), error_message, 0);
+                return NULL;
             }
         }
     }
@@ -1518,6 +1603,12 @@ static valkey_glide_advanced_base_client_configuration_t* _build_advanced_config
 
     advanced_config->connection_timeout = _determine_connection_timeout(params);
     advanced_config->tls_config         = _build_advanced_tls_config(params, is_cluster);
+
+    /* If TLS config build failed (exception thrown), clean up and return NULL */
+    if (EG(exception)) {
+        efree(advanced_config);
+        return NULL;
+    }
 
     return advanced_config;
 }

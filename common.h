@@ -121,6 +121,25 @@ typedef struct {
 #define VALKEY_GLIDE_USE_INSECURE_TLS "use_insecure_tls"
 #define VALKEY_GLIDE_ROOT_CERTS "root_certs"
 
+/* Compression Constants */
+#define VALKEY_GLIDE_COMPRESSION "compression"
+#define VALKEY_GLIDE_COMPRESSION_ENABLED "enabled"
+#define VALKEY_GLIDE_COMPRESSION_BACKEND "backend"
+#define VALKEY_GLIDE_COMPRESSION_LEVEL "compression_level"
+#define VALKEY_GLIDE_COMPRESSION_MIN_SIZE "min_compression_size"
+
+typedef enum {
+    VALKEY_GLIDE_COMPRESSION_BACKEND_ZSTD = 0,
+    VALKEY_GLIDE_COMPRESSION_BACKEND_LZ4  = 1
+} valkey_glide_compression_backend_t;
+
+typedef struct {
+    uint32_t                           min_compression_size;
+    int32_t                            compression_level; /* -1 means not set (use default) */
+    valkey_glide_compression_backend_t backend;
+    bool                               enabled;
+} valkey_glide_compression_config_t;
+
 typedef struct {
     int num_of_retries;
     int factor;
@@ -150,6 +169,7 @@ typedef struct {
     char*                                              client_name;        /* NULL if not set */
     char*                                              client_az;          /* NULL if not set */
     valkey_glide_advanced_base_client_configuration_t* advanced_config;    /* NULL if not set */
+    valkey_glide_compression_config_t*                 compression_config; /* NULL if not set */
     valkey_glide_read_from_t                           read_from;
     int                                                addresses_count;
     int                                                request_timeout;         /* -1 if not set */
@@ -181,7 +201,8 @@ typedef struct {
     zval*     credentials;
     zval*     reconnect_strategy;
     zval*     advanced_config;
-    zval*     context; /* Stream context for TLS */
+    zval*     context;     /* Stream context for TLS */
+    zval*     compression; /* Compression configuration */
     char*     client_name;
     char*     client_az;
     size_t    client_name_len;
@@ -198,9 +219,9 @@ typedef struct {
 
 void valkey_glide_init_common_constructor_params(
     valkey_glide_php_common_constructor_params_t* params);
-void valkey_glide_build_client_config_base(valkey_glide_php_common_constructor_params_t* params,
+int  valkey_glide_build_client_config_base(valkey_glide_php_common_constructor_params_t* params,
                                            valkey_glide_base_client_configuration_t*     config,
-                                           bool is_cluster);
+                                           bool                                          is_cluster);
 void valkey_glide_cleanup_client_config(valkey_glide_base_client_configuration_t* config);
 
 #if PHP_VERSION_ID < 80000

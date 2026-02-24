@@ -59,7 +59,10 @@ static int valkey_glide_cluster_create_connection(
     client_config.periodic_checks_manual = NULL;
 
     /* Populate configuration parameters shared between client and cluster connections. */
-    valkey_glide_build_client_config_base(&common_params, &client_config.base, true);
+    if (valkey_glide_build_client_config_base(&common_params, &client_config.base, true) ==
+        FAILURE) {
+        return FAILURE;
+    }
 
     /* Parse cluster-specific advanced config options */
     client_config.refresh_topology_from_initial_nodes = false; /* Default value */
@@ -162,12 +165,13 @@ PHP_METHOD(ValkeyGlideCluster, __construct) {
     zend_bool lazy_connect_is_null    = 1;
     zend_long database_id             = 0;
     zend_bool database_id_is_null     = 1;
+    zval*     compression             = NULL;
 
     valkey_glide_php_common_constructor_params_t common_params;
     valkey_glide_init_common_constructor_params(&common_params);
     valkey_glide_object* valkey_glide;
 
-    ZEND_PARSE_PARAMETERS_START(0, 19)
+    ZEND_PARSE_PARAMETERS_START(0, 20)
     Z_PARAM_OPTIONAL
     Z_PARAM_STRING_OR_NULL(name, name_len)
     Z_PARAM_ARRAY_OR_NULL(seeds)
@@ -188,6 +192,7 @@ PHP_METHOD(ValkeyGlideCluster, __construct) {
     Z_PARAM_ARRAY_OR_NULL(advanced_config)
     Z_PARAM_BOOL_OR_NULL(lazy_connect, lazy_connect_is_null)
     Z_PARAM_LONG_OR_NULL(database_id, database_id_is_null)
+    Z_PARAM_ARRAY_OR_NULL(compression)
     ZEND_PARSE_PARAMETERS_END_EX(RETURN_THROWS());
 
     valkey_glide = VALKEY_GLIDE_PHP_ZVAL_GET_OBJECT(valkey_glide_object, getThis());
@@ -245,6 +250,7 @@ PHP_METHOD(ValkeyGlideCluster, __construct) {
     common_params.lazy_connect_is_null    = lazy_connect_is_null;
     common_params.database_id             = database_id;
     common_params.database_id_is_null     = database_id_is_null;
+    common_params.compression             = compression;
 
     /* Call helper function to create cluster connection */
     valkey_glide_cluster_create_connection(
@@ -261,6 +267,10 @@ static zend_function_entry valkey_glide_cluster_methods[] = {
 PHP_METHOD(ValkeyGlideCluster, close) {
     RETURN_TRUE;
 }
+
+/* {{{ proto array ValkeyGlideCluster::getStatistics() */
+GET_STATISTICS_METHOD_IMPL(ValkeyGlideCluster)
+/* }}} */
 
 /* {{{ proto string ValkeyGlideCluster::get(string key) */
 GET_METHOD_IMPL(ValkeyGlideCluster)
